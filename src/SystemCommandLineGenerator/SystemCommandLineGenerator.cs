@@ -106,6 +106,7 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
             .Select(p => new ArgumentInfo(
                 p.Name,
                 p.Type.ToDisplayString(),
+                p.NullableAnnotation == NullableAnnotation.Annotated,
                 p.HasExplicitDefaultValue,
                 p.HasExplicitDefaultValue
                     ? FormatDefaultValue(p.ExplicitDefaultValue, p.Type)
@@ -336,7 +337,17 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
 
         foreach (var arg in info.Arguments)
         {
-            builder.AppendLine($"var {arg.Name}Value = parseResult.GetValue({arg.Name}Argument)!;");
+            if (arg.IsNullable)
+            {
+                // Nullable type - null is a valid value
+                builder.AppendLine($"var {arg.Name}Value = parseResult.GetValue({arg.Name}Argument);");
+            }
+            else
+            {
+                // Non-nullable type - use defensive guard (S.CL enforces required args)
+                builder.AppendLine($"var {arg.Name}Value = parseResult.GetValue({arg.Name}Argument)");
+                builder.AppendLine($"    ?? throw new InvalidOperationException(\"Argument '{arg.Name}' was not provided.\");");
+            }
         }
 
         var argValues = string.Join(", ", info.Arguments.Select(a => $"{a.Name}Value"));
@@ -368,6 +379,7 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
     private sealed record ArgumentInfo(
         string Name,
         string TypeName,
+        bool IsNullable,
         bool HasDefaultValue,
         string? DefaultValue
     );
