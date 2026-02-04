@@ -3,9 +3,12 @@
 
 #nullable enable
 
+using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -18,32 +21,52 @@ namespace SystemCommandLineGenerator;
 public sealed class CommandLineGenerator : IIncrementalGenerator
 {
     private const string CommandAttributeName = "SystemCommandLineGenerator.CommandAttribute";
+    private const string MapCommandLineOptionsAttributeName = "SystemCommandLineGenerator.MapCommandLineOptionsAttribute";
     private const string ArgumentAttributeName = "SystemCommandLineGenerator.ArgumentAttribute";
+    private const string OptionAttributeName = "SystemCommandLineGenerator.OptionAttribute";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        // Always generate the base infrastructure (attributes, ConsoleApp, ConsoleAppBuilder base)
+        // Always generate the base infrastructure (attributes)
         context.RegisterPostInitializationOutput(static ctx =>
         {
             ctx.AddSource("Attributes.g.cs", SourceText.From(GenerateAttributes(), Encoding.UTF8));
         });
 
-        var commandClasses = context
+        // Discover options types with [MapCommandLineOptions]
+        var optionsTypes = context
+            .SyntaxProvider.ForAttributeWithMetadataName(
+                MapCommandLineOptionsAttributeName,
+                predicate: static (node, _) => node is RecordDeclarationSyntax or ClassDeclarationSyntax,
+                transform: static (ctx, ct) => GetOptionsTypeInfo(ctx, ct)
+            )
+            .Where(static o => o is not null)
+            .Collect()!;
+
+        // Discover command methods with [Command]
+        var commandMethods = context
             .SyntaxProvider.ForAttributeWithMetadataName(
                 CommandAttributeName,
-                predicate: static (node, _) => node is ClassDeclarationSyntax,
-                transform: static (ctx, ct) => GetCommandInfo(ctx, ct)
+                predicate: static (node, _) => node is MethodDeclarationSyntax,
+                transform: static (ctx, ct) => GetCommandMethodInfo(ctx, ct)
             )
-            .Where(static c => c is not null)!;
+            .Where(static c => c is not null)
+            .Collect()!;
 
-        // Collect all commands and generate ConsoleApp + ConsoleAppBuilder
-        var allCommands = commandClasses.Collect();
+        // Combine options types with command methods
+        var combined = commandMethods.Combine(optionsTypes);
 
         context.RegisterSourceOutput(
-            allCommands,
-            static (spc, commands) =>
+            combined,
+            static (spc, data) =>
             {
-                GenerateConsoleApp(spc, commands!);
+                var commands = data.Left;
+                var options = data.Right;
+                var optionsDict = options
+                    .Where(o => o is not null)
+                    .ToDictionary(o => o!.FullTypeName, o => o!);
+
+                GenerateConsoleApp(spc, commands!, optionsDict);
             }
         );
     }
@@ -56,26 +79,241 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
 
             namespace SystemCommandLineGenerator;
 
-            [global::System.AttributeUsage(global::System.AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
-            internal sealed class CommandAttribute(string name) : global::System.Attribute
+            /// <summary>
+            /// Marks a method as a CLI command. The method parameters should be options types
+            /// decorated with <see cref="MapCommandLineOptionsAttribute"/>.
+            /// </summary>
+            [global::System.AttributeUsage(global::System.AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
+            internal sealed class CommandAttribute : global::System.Attribute
             {
-                public string Name { get; } = name;
+                public CommandAttribute(string name) => Name = name;
+                public CommandAttribute() => Name = "";
+
+                /// <summary>The command name. Empty string for root command.</summary>
+                public string Name { get; }
+
+                /// <summary>Description shown in help text.</summary>
+                public string? Description { get; set; }
             }
 
-            [global::System.AttributeUsage(global::System.AttributeTargets.Parameter, Inherited = false, AllowMultiple = false)]
-            internal sealed class OptionAttribute : global::System.Attribute { }
+            /// <summary>
+            /// Marks a record or class as a container for command-line options and arguments.
+            /// Properties without attributes become options; use <see cref="ArgumentAttribute"/> for arguments.
+            /// </summary>
+            [global::System.AttributeUsage(global::System.AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
+            internal sealed class MapCommandLineOptionsAttribute : global::System.Attribute
+            {
+                /// <summary>
+                /// When true (default), property names are converted to kebab-case for option names.
+                /// </summary>
+                public bool UseKebabCase { get; set; } = true;
+            }
 
-            [global::System.AttributeUsage(global::System.AttributeTargets.Parameter, Inherited = false, AllowMultiple = false)]
-            internal sealed class ArgumentAttribute : global::System.Attribute { }
+            /// <summary>
+            /// Marks a parameter or property as a CLI option with explicit configuration.
+            /// </summary>
+            [global::System.AttributeUsage(global::System.AttributeTargets.Parameter | global::System.AttributeTargets.Property, Inherited = false, AllowMultiple = false)]
+            internal sealed class OptionAttribute : global::System.Attribute
+            {
+                /// <summary>The primary option name (e.g., "--verbose"). If null, derived from property name.</summary>
+                public string? Name { get; set; }
+
+                /// <summary>Short alias (e.g., "-v").</summary>
+                public string? Alias { get; set; }
+
+                /// <summary>Description shown in help text.</summary>
+                public string? Description { get; set; }
+            }
+
+            /// <summary>
+            /// Marks a parameter or property as a positional CLI argument.
+            /// </summary>
+            [global::System.AttributeUsage(global::System.AttributeTargets.Parameter | global::System.AttributeTargets.Property, Inherited = false, AllowMultiple = false)]
+            internal sealed class ArgumentAttribute : global::System.Attribute
+            {
+                /// <summary>The argument name shown in help text.</summary>
+                public string? Name { get; set; }
+
+                /// <summary>Description shown in help text.</summary>
+                public string? Description { get; set; }
+            }
             """;
     }
 
-    private static CommandInfo? GetCommandInfo(
+    private static OptionsTypeInfo? GetOptionsTypeInfo(
         GeneratorAttributeSyntaxContext ctx,
         CancellationToken ct
     )
     {
-        if (ctx.TargetSymbol is not INamedTypeSymbol classSymbol)
+        if (ctx.TargetSymbol is not INamedTypeSymbol typeSymbol)
+            return null;
+
+        var mapAttr = ctx.Attributes.FirstOrDefault(a =>
+            a.AttributeClass?.ToDisplayString() == MapCommandLineOptionsAttributeName
+        );
+
+        if (mapAttr is null)
+            return null;
+
+        // Check for UseKebabCase property
+        var useKebabCase = true;
+        foreach (var namedArg in mapAttr.NamedArguments)
+        {
+            if (namedArg.Key == "UseKebabCase" && namedArg.Value.Value is bool val)
+            {
+                useKebabCase = val;
+            }
+        }
+
+        // Get members from primary constructor parameters (for records) or properties
+        var members = new List<OptionsMemberInfo>();
+
+        // Check for primary constructor (records and classes with primary constructors)
+        var primaryCtor = typeSymbol.InstanceConstructors
+            .FirstOrDefault(c => c.Parameters.Length > 0 &&
+                c.DeclaringSyntaxReferences.Any(r =>
+                    r.GetSyntax(ct) is RecordDeclarationSyntax or ClassDeclarationSyntax));
+
+        if (primaryCtor is not null)
+        {
+            foreach (var param in primaryCtor.Parameters)
+            {
+                var memberInfo = ExtractMemberInfo(param, useKebabCase);
+                members.Add(memberInfo);
+            }
+        }
+        else
+        {
+            // Fall back to public properties with public setters or init
+            foreach (var prop in typeSymbol.GetMembers().OfType<IPropertySymbol>())
+            {
+                if (prop.DeclaredAccessibility != Accessibility.Public)
+                    continue;
+                if (prop.SetMethod is null || prop.SetMethod.DeclaredAccessibility != Accessibility.Public)
+                    continue;
+
+                var memberInfo = ExtractMemberInfoFromProperty(prop, useKebabCase);
+                members.Add(memberInfo);
+            }
+        }
+
+        var ns = typeSymbol.ContainingNamespace.ToDisplayString();
+        var fullTypeName = string.IsNullOrEmpty(ns) || ns == "<global namespace>"
+            ? $"global::{typeSymbol.Name}"
+            : $"global::{ns}.{typeSymbol.Name}";
+
+        return new OptionsTypeInfo(
+            ns,
+            typeSymbol.Name,
+            fullTypeName,
+            members.ToImmutableArray(),
+            useKebabCase
+        );
+    }
+
+    private static OptionsMemberInfo ExtractMemberInfo(IParameterSymbol param, bool useKebabCase)
+    {
+        var isArgument = false;
+        string? explicitName = null;
+        string? alias = null;
+        string? description = null;
+
+        foreach (var attr in param.GetAttributes())
+        {
+            var attrName = attr.AttributeClass?.ToDisplayString();
+
+            if (attrName == ArgumentAttributeName)
+            {
+                isArgument = true;
+                foreach (var namedArg in attr.NamedArguments)
+                {
+                    if (namedArg.Key == "Name") explicitName = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Description") description = namedArg.Value.Value as string;
+                }
+            }
+            else if (attrName == OptionAttributeName)
+            {
+                foreach (var namedArg in attr.NamedArguments)
+                {
+                    if (namedArg.Key == "Name") explicitName = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Alias") alias = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Description") description = namedArg.Value.Value as string;
+                }
+            }
+        }
+
+        var cliName = explicitName ?? (useKebabCase ? ToKebabCase(param.Name) : param.Name);
+        var isBoolean = param.Type.SpecialType == SpecialType.System_Boolean;
+
+        return new OptionsMemberInfo(
+            param.Name,
+            param.Type.ToDisplayString(),
+            cliName,
+            isArgument,
+            isBoolean,
+            param.NullableAnnotation == NullableAnnotation.Annotated,
+            param.HasExplicitDefaultValue,
+            param.HasExplicitDefaultValue ? FormatDefaultValue(param.ExplicitDefaultValue, param.Type) : null,
+            alias,
+            description
+        );
+    }
+
+    private static OptionsMemberInfo ExtractMemberInfoFromProperty(IPropertySymbol prop, bool useKebabCase)
+    {
+        var isArgument = false;
+        string? explicitName = null;
+        string? alias = null;
+        string? description = null;
+
+        foreach (var attr in prop.GetAttributes())
+        {
+            var attrName = attr.AttributeClass?.ToDisplayString();
+
+            if (attrName == ArgumentAttributeName)
+            {
+                isArgument = true;
+                foreach (var namedArg in attr.NamedArguments)
+                {
+                    if (namedArg.Key == "Name") explicitName = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Description") description = namedArg.Value.Value as string;
+                }
+            }
+            else if (attrName == OptionAttributeName)
+            {
+                foreach (var namedArg in attr.NamedArguments)
+                {
+                    if (namedArg.Key == "Name") explicitName = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Alias") alias = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Description") description = namedArg.Value.Value as string;
+                }
+            }
+        }
+
+        var cliName = explicitName ?? (useKebabCase ? ToKebabCase(prop.Name) : prop.Name);
+        var isBoolean = prop.Type.SpecialType == SpecialType.System_Boolean;
+
+        // Properties don't have default values in the same way; we'd need to analyze initializers
+        return new OptionsMemberInfo(
+            prop.Name,
+            prop.Type.ToDisplayString(),
+            cliName,
+            isArgument,
+            isBoolean,
+            prop.NullableAnnotation == NullableAnnotation.Annotated,
+            false,
+            null,
+            alias,
+            description
+        );
+    }
+
+    private static CommandMethodInfo? GetCommandMethodInfo(
+        GeneratorAttributeSyntaxContext ctx,
+        CancellationToken ct
+    )
+    {
+        if (ctx.TargetSymbol is not IMethodSymbol methodSymbol)
             return null;
 
         var commandAttr = ctx.Attributes.FirstOrDefault(a =>
@@ -85,41 +323,61 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         if (commandAttr is null)
             return null;
 
-        var commandName =
-            commandAttr.ConstructorArguments.Length > 0
-                ? commandAttr.ConstructorArguments[0].Value as string ?? classSymbol.Name
-                : classSymbol.Name;
+        var commandName = commandAttr.ConstructorArguments.Length > 0
+            ? commandAttr.ConstructorArguments[0].Value as string ?? ""
+            : "";
 
-        var executeMethod = classSymbol
-            .GetMembers()
-            .OfType<IMethodSymbol>()
-            .FirstOrDefault(m => m.Name == "ExecuteAsync");
+        string? description = null;
+        foreach (var namedArg in commandAttr.NamedArguments)
+        {
+            if (namedArg.Key == "Description") description = namedArg.Value.Value as string;
+        }
 
-        if (executeMethod is null)
-            return null;
+        var containingType = methodSymbol.ContainingType;
+        var containingNs = containingType.ContainingNamespace.ToDisplayString();
+        var containingFullName = string.IsNullOrEmpty(containingNs) || containingNs == "<global namespace>"
+            ? $"global::{containingType.Name}"
+            : $"global::{containingNs}.{containingType.Name}";
 
-        var arguments = executeMethod
-            .Parameters.Where(p =>
-                p.GetAttributes()
-                    .Any(a => a.AttributeClass?.ToDisplayString() == ArgumentAttributeName)
-            )
-            .Select(p => new ArgumentInfo(
-                p.Name,
-                p.Type.ToDisplayString(),
-                p.NullableAnnotation == NullableAnnotation.Annotated,
-                p.HasExplicitDefaultValue,
-                p.HasExplicitDefaultValue
-                    ? FormatDefaultValue(p.ExplicitDefaultValue, p.Type)
-                    : null
-            ))
+        // Extract parameter types (should be options types)
+        var optionsTypeNames = methodSymbol.Parameters
+            .Select(p =>
+            {
+                var ns = p.Type.ContainingNamespace?.ToDisplayString() ?? "";
+                return string.IsNullOrEmpty(ns) || ns == "<global namespace>"
+                    ? $"global::{p.Type.Name}"
+                    : $"global::{ns}.{p.Type.Name}";
+            })
             .ToImmutableArray();
 
-        return new CommandInfo(
-            classSymbol.ContainingNamespace.ToDisplayString(),
-            classSymbol.Name,
+        return new CommandMethodInfo(
+            containingNs,
+            containingType.Name,
+            containingFullName,
+            methodSymbol.Name,
             commandName,
-            arguments
+            description,
+            optionsTypeNames
         );
+    }
+
+    private static string ToKebabCase(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return name;
+
+        // Insert hyphen before each uppercase letter (except the first), then lowercase
+        var result = new StringBuilder();
+        for (int i = 0; i < name.Length; i++)
+        {
+            var c = name[i];
+            if (i > 0 && char.IsUpper(c))
+            {
+                result.Append('-');
+            }
+            result.Append(char.ToLowerInvariant(c));
+        }
+        return result.ToString();
     }
 
     private static string FormatDefaultValue(object? value, ITypeSymbol type)
@@ -138,7 +396,8 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
 
     private static void GenerateConsoleApp(
         SourceProductionContext ctx,
-        ImmutableArray<CommandInfo?> commands
+        ImmutableArray<CommandMethodInfo?> commands,
+        Dictionary<string, OptionsTypeInfo> optionsTypes
     )
     {
         var builder = new IndentingBuilder();
@@ -195,27 +454,36 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         builder.AppendLine("{");
         builder.Indent();
 
-        // Generate switch cases for each command
+        // Generate switch cases for each command - keyed by containing class
         var validCommands = commands.Where(c => c is not null).ToList();
-        if (validCommands.Count > 0)
-        {
-            for (int i = 0; i < validCommands.Count; i++)
-            {
-                var cmd = validCommands[i]!;
-                var prefix = i == 0 ? "if" : "else if";
+        var containingClasses = validCommands
+            .GroupBy(c => c!.ContainingClassFullName)
+            .ToList();
 
-                builder.AppendLine($"{prefix} (typeof(T) == typeof({cmd.FullTypeName}))");
+        if (containingClasses.Count > 0)
+        {
+            for (int i = 0; i < containingClasses.Count; i++)
+            {
+                var group = containingClasses[i];
+                var prefix = i == 0 ? "if" : "else if";
+                var firstCmd = group.First()!;
+
+                builder.AppendLine($"{prefix} (typeof(T) == typeof({firstCmd.ContainingClassFullName}))");
                 builder.AppendLine("{");
                 builder.Indent();
-                builder.AppendLine($"Host.Services.AddTransient<{cmd.FullTypeName}>();");
+                builder.AppendLine($"Host.Services.AddTransient<{firstCmd.ContainingClassFullName}>();");
 
-                if (cmd.IsRoot)
+                foreach (var cmd in group)
                 {
-                    builder.AppendLine($"_rootCommandFactory = Create{cmd.ClassName};");
-                }
-                else
-                {
-                    builder.AppendLine($"_commandFactories.Add(Create{cmd.ClassName});");
+                    var factoryName = $"Create{firstCmd.ContainingClassName}_{cmd!.MethodName}";
+                    if (cmd.IsRoot)
+                    {
+                        builder.AppendLine($"_rootCommandFactory = sp => {factoryName}(sp);");
+                    }
+                    else
+                    {
+                        builder.AppendLine($"_commandFactories.Add(sp => {factoryName}(sp));");
+                    }
                 }
 
                 builder.Dedent();
@@ -225,13 +493,13 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
             builder.AppendLine("else");
             builder.AppendLine("{");
             builder.Indent();
-            builder.AppendLine("throw new InvalidOperationException($\"Type '{typeof(T).FullName}' is not a registered command.\");");
+            builder.AppendLine("throw new InvalidOperationException($\"Type '{typeof(T).FullName}' is not a registered command class.\");");
             builder.Dedent();
             builder.AppendLine("}");
         }
         else
         {
-            builder.AppendLine("throw new InvalidOperationException($\"Type '{typeof(T).FullName}' is not a registered command.\");");
+            builder.AppendLine("throw new InvalidOperationException($\"Type '{typeof(T).FullName}' is not a registered command class.\");");
         }
 
         builder.AppendLine("");
@@ -240,13 +508,13 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         builder.AppendLine("}");
         builder.AppendLine("");
 
-        // Generate private factory methods for each command
+        // Generate private factory methods for each command method
         foreach (var cmd in commands)
         {
             if (cmd is null)
                 continue;
 
-            GenerateCommandFactory(builder, cmd);
+            GenerateCommandFactory(builder, cmd, optionsTypes);
             builder.AppendLine("");
         }
 
@@ -284,50 +552,140 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         ctx.AddSource("ConsoleApp.g.cs", SourceText.From(builder.ToString(), Encoding.UTF8));
     }
 
-    private static void GenerateCommandFactory(IndentingBuilder builder, CommandInfo info)
+    private static void GenerateCommandFactory(
+        IndentingBuilder builder,
+        CommandMethodInfo cmd,
+        Dictionary<string, OptionsTypeInfo> optionsTypes
+    )
     {
-        var returnType = info.IsRoot ? "RootCommand" : "Command";
+        var returnType = cmd.IsRoot ? "RootCommand" : "Command";
+        var factoryName = $"Create{cmd.ContainingClassName}_{cmd.MethodName}";
 
-        builder.AppendLine($"private static {returnType} Create{info.ClassName}(IServiceProvider sp)");
+        builder.AppendLine($"private static {returnType} {factoryName}(IServiceProvider sp)");
         builder.AppendLine("{");
         builder.Indent();
 
-        builder.AppendLine($"var instance = sp.GetRequiredService<{info.FullTypeName}>();");
+        builder.AppendLine($"var instance = sp.GetRequiredService<{cmd.ContainingClassFullName}>();");
         builder.AppendLine("");
 
-        // Create arguments
-        foreach (var arg in info.Arguments)
+        // Collect all members from all options types for this command
+        var allMembers = new List<(string OptionsTypeName, OptionsMemberInfo Member, string VarPrefix)>();
+        int optIdx = 0;
+        foreach (var optTypeName in cmd.OptionsTypeNames)
         {
-            if (arg.HasDefaultValue)
+            if (optionsTypes.TryGetValue(optTypeName, out var optType))
             {
-                builder.AppendLine(
-                    $"var {arg.Name}Argument = new Argument<{arg.TypeName}>(\"{arg.Name}\") {{ DefaultValueFactory = _ => {arg.DefaultValue} }};"
-                );
-            }
-            else
-            {
-                builder.AppendLine(
-                    $"var {arg.Name}Argument = new Argument<{arg.TypeName}>(\"{arg.Name}\");"
-                );
+                var prefix = $"opt{optIdx}_";
+                foreach (var member in optType.Members)
+                {
+                    allMembers.Add((optTypeName, member, prefix));
+                }
+                optIdx++;
             }
         }
 
-        if (info.Arguments.Length > 0)
-            builder.AppendLine("");
+        // Generate argument/option variables
+        foreach (var (_, member, prefix) in allMembers)
+        {
+            var varName = $"{prefix}{member.PropertyName}";
+
+            if (member.IsArgument)
+            {
+                // Argument
+                var argName = member.CliName;
+                if (member.HasDefaultValue)
+                {
+                    builder.AppendLine(
+                        $"var {varName}Arg = new Argument<{member.TypeName}>(\"{argName}\") {{ DefaultValueFactory = _ => {member.DefaultValue} }};"
+                    );
+                }
+                else
+                {
+                    builder.AppendLine(
+                        $"var {varName}Arg = new Argument<{member.TypeName}>(\"{argName}\");"
+                    );
+                }
+
+                if (member.Description is not null)
+                {
+                    builder.AppendLine($"{varName}Arg.Description = \"{EscapeString(member.Description)}\";");
+                }
+            }
+            else
+            {
+                // Option
+                var optName = $"--{member.CliName}";
+                if (member.IsBoolean)
+                {
+                    // Boolean switch - Arity.Zero means flag behavior
+                    builder.AppendLine(
+                        $"var {varName}Opt = new Option<bool>(\"{optName}\") {{ Arity = ArgumentArity.Zero }};"
+                    );
+                    if (member.HasDefaultValue)
+                    {
+                        builder.AppendLine($"{varName}Opt.DefaultValueFactory = _ => {member.DefaultValue};");
+                    }
+                }
+                else if (member.HasDefaultValue)
+                {
+                    builder.AppendLine(
+                        $"var {varName}Opt = new Option<{member.TypeName}>(\"{optName}\") {{ DefaultValueFactory = _ => {member.DefaultValue} }};"
+                    );
+                }
+                else
+                {
+                    builder.AppendLine(
+                        $"var {varName}Opt = new Option<{member.TypeName}>(\"{optName}\");"
+                    );
+
+                    // Required if no default and non-nullable
+                    if (!member.IsNullable)
+                    {
+                        builder.AppendLine($"{varName}Opt.Required = true;");
+                    }
+                }
+
+                if (member.Alias is not null)
+                {
+                    builder.AppendLine($"{varName}Opt.Aliases.Add(\"{member.Alias}\");");
+                }
+
+                if (member.Description is not null)
+                {
+                    builder.AppendLine($"{varName}Opt.Description = \"{EscapeString(member.Description)}\";");
+                }
+            }
+        }
+
+        builder.AppendLine("");
 
         // Create the command
-        if (info.IsRoot)
+        if (cmd.IsRoot)
         {
             builder.AppendLine("var command = new RootCommand();");
         }
         else
         {
-            builder.AppendLine($"var command = new Command(\"{info.CommandName}\");");
+            builder.AppendLine($"var command = new Command(\"{cmd.CommandName}\");");
         }
 
-        foreach (var arg in info.Arguments)
+        if (cmd.Description is not null)
         {
-            builder.AppendLine($"command.Arguments.Add({arg.Name}Argument);");
+            builder.AppendLine($"command.Description = \"{EscapeString(cmd.Description)}\";");
+        }
+
+        // Add arguments and options to command
+        foreach (var (_, member, prefix) in allMembers)
+        {
+            var varName = $"{prefix}{member.PropertyName}";
+            if (member.IsArgument)
+            {
+                builder.AppendLine($"command.Arguments.Add({varName}Arg);");
+            }
+            else
+            {
+                builder.AppendLine($"command.Options.Add({varName}Opt);");
+            }
         }
 
         builder.AppendLine("");
@@ -335,23 +693,58 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         builder.AppendLine("{");
         builder.Indent();
 
-        foreach (var arg in info.Arguments)
+        // Build options instances
+        optIdx = 0;
+        var optionVarNames = new List<string>();
+        foreach (var optTypeName in cmd.OptionsTypeNames)
         {
-            if (arg.IsNullable)
+            if (optionsTypes.TryGetValue(optTypeName, out var optType))
             {
-                // Nullable type - null is a valid value
-                builder.AppendLine($"var {arg.Name}Value = parseResult.GetValue({arg.Name}Argument);");
-            }
-            else
-            {
-                // Non-nullable type - use defensive guard (S.CL enforces required args)
-                builder.AppendLine($"var {arg.Name}Value = parseResult.GetValue({arg.Name}Argument)");
-                builder.AppendLine($"    ?? throw new InvalidOperationException(\"Argument '{arg.Name}' was not provided.\");");
+                var prefix = $"opt{optIdx}_";
+                var optVarName = $"options{optIdx}";
+                optionVarNames.Add(optVarName);
+
+                // Get values for each member
+                var memberValues = new List<string>();
+                foreach (var member in optType.Members)
+                {
+                    var varName = $"{prefix}{member.PropertyName}";
+                    var symbolVar = member.IsArgument ? $"{varName}Arg" : $"{varName}Opt";
+
+                    if (member.IsNullable)
+                    {
+                        // Nullable type - null is valid
+                        memberValues.Add($"parseResult.GetValue({symbolVar})");
+                    }
+                    else if (member.IsBoolean)
+                    {
+                        // Bool is a value type, GetValue returns bool not bool?
+                        memberValues.Add($"parseResult.GetValue({symbolVar})");
+                    }
+                    else if (member.HasDefaultValue)
+                    {
+                        // Has default but not nullable - use default as null coalesce
+                        memberValues.Add($"parseResult.GetValue({symbolVar}) ?? {member.DefaultValue}");
+                    }
+                    else
+                    {
+                        // Required, non-nullable - throw if null
+                        memberValues.Add(
+                            $"parseResult.GetValue({symbolVar}) ?? throw new InvalidOperationException(\"{(member.IsArgument ? "Argument" : "Option")} '{member.CliName}' was not provided.\")"
+                        );
+                    }
+                }
+
+                var ctorArgs = string.Join(", ", memberValues);
+                builder.AppendLine($"var {optVarName} = new {optTypeName}({ctorArgs});");
+
+                optIdx++;
             }
         }
 
-        var argValues = string.Join(", ", info.Arguments.Select(a => $"{a.Name}Value"));
-        builder.AppendLine($"await instance.ExecuteAsync({argValues});");
+        // Call the method
+        var methodArgs = string.Join(", ", optionVarNames);
+        builder.AppendLine($"await instance.{cmd.MethodName}({methodArgs});");
 
         builder.Dedent();
         builder.AppendLine("});");
@@ -362,25 +755,44 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         builder.AppendLine("}");
     }
 
-    private sealed record CommandInfo(
+    private static string EscapeString(string value)
+    {
+        return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+    }
+
+    // Data models
+
+    private sealed record OptionsTypeInfo(
         string Namespace,
-        string ClassName,
+        string TypeName,
+        string FullTypeName,
+        ImmutableArray<OptionsMemberInfo> Members,
+        bool UseKebabCase
+    );
+
+    private sealed record OptionsMemberInfo(
+        string PropertyName,
+        string TypeName,
+        string CliName,
+        bool IsArgument,
+        bool IsBoolean,
+        bool IsNullable,
+        bool HasDefaultValue,
+        string? DefaultValue,
+        string? Alias,
+        string? Description
+    );
+
+    private sealed record CommandMethodInfo(
+        string ContainingNamespace,
+        string ContainingClassName,
+        string ContainingClassFullName,
+        string MethodName,
         string CommandName,
-        ImmutableArray<ArgumentInfo> Arguments
+        string? Description,
+        ImmutableArray<string> OptionsTypeNames
     )
     {
         public bool IsRoot => string.IsNullOrEmpty(CommandName);
-
-        public string FullTypeName => string.IsNullOrEmpty(Namespace) || Namespace == "<global namespace>"
-            ? $"global::{ClassName}"
-            : $"global::{Namespace}.{ClassName}";
     }
-
-    private sealed record ArgumentInfo(
-        string Name,
-        string TypeName,
-        bool IsNullable,
-        bool HasDefaultValue,
-        string? DefaultValue
-    );
 }
