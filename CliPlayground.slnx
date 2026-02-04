@@ -1,3 +1,5 @@
 <Solution>
   <Project Path="src/CliPlayground.Shared/CliPlayground.Shared.csproj" />
+  <Project Path="src/CliPlayground.SourceGen/CliPlayground.SourceGen.csproj" />
+  <Project Path="src/CliPlayground.SourceGen.Core/CliPlayground.SourceGen.Core.csproj" />
 </Solution>
