@@ -1,5 +1,4 @@
 <Solution>
   <Project Path="src/SystemCommandLineGenerator/SystemCommandLineGenerator.csproj" />
-  <Project Path="src/SystemCommandLineGenerator.Core/SystemCommandLineGenerator.Core.csproj" />
   <Project Path="src/Sample/Sample.csproj" />
 </Solution>

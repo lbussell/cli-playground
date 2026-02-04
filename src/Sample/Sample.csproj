@@ -7,7 +7,8 @@
     <PublishAot>true</PublishAot>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../SystemCommandLineGenerator.Core/SystemCommandLineGenerator.Core.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="System.CommandLine" />
     <ProjectReference
       Include="../SystemCommandLineGenerator/SystemCommandLineGenerator.csproj"
       OutputItemType="Analyzer"
