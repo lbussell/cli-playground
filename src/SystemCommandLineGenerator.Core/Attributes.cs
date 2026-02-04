@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Logan Bussell
 // SPDX-License-Identifier: MIT
 
-namespace CliPlayground.SourceGen;
+namespace SystemCommandLineGenerator;
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
 public sealed class CommandAttribute(string name) : Attribute
@@ -10,11 +10,7 @@ public sealed class CommandAttribute(string name) : Attribute
 }
 
 [AttributeUsage(AttributeTargets.Parameter, Inherited = false, AllowMultiple = false)]
-public sealed class OptionAttribute : Attribute
-{
-}
+public sealed class OptionAttribute : Attribute { }
 
 [AttributeUsage(AttributeTargets.Parameter, Inherited = false, AllowMultiple = false)]
-public sealed class ArgumentAttribute : Attribute
-{
-}
+public sealed class ArgumentAttribute : Attribute { }
