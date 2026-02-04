@@ -1,11 +1,12 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 Logan Bussell
 // SPDX-License-Identifier: MIT
 
-using Microsoft.Extensions.DependencyInjection;
+// CLI with Microsoft.Extensions.Hosting
+// Uses ConsoleAppBuilder for the hosting infrastructure
+
 using SystemCommandLineGenerator;
 
 var builder = ConsoleApp.CreateBuilder(args);
-builder.Host.Services.AddSingleton<GreetingService>();
 builder.AddCommand<Commands>();
 
 return await builder.RunAsync();
@@ -29,12 +30,10 @@ internal record VerboseOptions(
     bool Verbose = false
 );
 
-// Command class with multiple commands
+// Command class
 
-internal sealed class Commands(GreetingService greetingService)
+internal sealed class Commands
 {
-    private readonly GreetingService _greetingService = greetingService;
-
     [Command("", Description = "Root command - shows welcome message")]
     public Task RootAsync()
     {
@@ -49,20 +48,14 @@ internal sealed class Commands(GreetingService greetingService)
         {
             Console.WriteLine($"[DEBUG] Greeting: {options.Greeting}, Name: {options.Name}");
         }
-        _greetingService.Greet(options.Name, options.Greeting);
+        Console.WriteLine($"{options.Greeting}, {options.Name}!");
         return Task.CompletedTask;
     }
 
     [Command("goodbye", Description = "Say goodbye to someone")]
     public Task GoodbyeAsync(GoodbyeOptions options)
     {
-        _greetingService.SayGoodbye(options.Name);
+        Console.WriteLine($"Goodbye, {options.Name}!");
         return Task.CompletedTask;
     }
-}
-
-internal sealed class GreetingService
-{
-    public void Greet(string name, string greeting = "Hello") => Console.WriteLine($"{greeting}, {name}!");
-    public void SayGoodbye(string name) => Console.WriteLine($"Goodbye, {name}!");
 }
