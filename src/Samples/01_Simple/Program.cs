@@ -7,20 +7,16 @@
 using System.CommandLine;
 using SystemCommandLineGenerator;
 
-var root = new RootCommand("Description");
-
-// Add generated arguments and options
-foreach (var arg in CommandLineOptionsMapper.Arguments) root.Add(arg);
-foreach (var opt in CommandLineOptionsMapper.Options) root.Add(opt);
-
-root.SetAction((parseResult, ct) =>
+var myCommand = new RootCommand(description: "Command line app without hosting or dependency injection.");
+myCommand.AddOptions<CommandLineOptions>();
+myCommand.SetAction((parseResult, ct) =>
 {
     var options = CommandLineOptionsMapper.Parse(parseResult);
     Console.WriteLine($"{options.Greeting}, {options.Name}!");
     return Task.CompletedTask;
 });
 
-return await root.Parse(args).InvokeAsync();
+return await myCommand.Parse(args).InvokeAsync();
 
 [MapCommandLineOptions]
 internal sealed record CommandLineOptions([Argument] string Name, string Greeting = "Hello");
