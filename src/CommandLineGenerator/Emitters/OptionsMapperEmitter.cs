@@ -113,8 +113,15 @@ internal static class OptionsMapperEmitter
             {
                 ctorArgs.Add($"parseResult.GetValue({symbolVar})");
             }
+            else if (member.IsValueType && member.HasDefaultValue)
+            {
+                // For value types with defaults, don't use ??, just GetValue
+                // System.CommandLine will use DefaultValueFactory automatically
+                ctorArgs.Add($"parseResult.GetValue({symbolVar})");
+            }
             else if (member.HasDefaultValue)
             {
+                // For reference types (like string), use ?? operator
                 ctorArgs.Add($"parseResult.GetValue({symbolVar}) ?? {member.DefaultValue}");
             }
             else
