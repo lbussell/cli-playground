@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 using System.Text;
+using Microsoft.CodeAnalysis;
 
 namespace CommandLineGenerator;
 
@@ -41,14 +42,36 @@ internal static class Utilities
     }
 
     /// <summary>
+    /// Gets a fully qualified type name with global:: prefix.
+    /// </summary>
+    public static string GetFullyQualifiedName(string? ns, string typeName)
+    {
+        var hasNamespace = !string.IsNullOrEmpty(ns) && ns != Namespaces.Global;
+        return hasNamespace ? $"global::{ns}.{typeName}" : $"global::{typeName}";
+    }
+
+    /// <summary>
     /// Gets the fully qualified mapper class name for an options type.
     /// </summary>
     public static string GetMapperName(OptionsTypeInfo optType)
     {
-        var hasNamespace =
-            !string.IsNullOrEmpty(optType.Namespace) && optType.Namespace != "<global namespace>";
-        return hasNamespace
-            ? $"global::{optType.Namespace}.{optType.TypeName}Mapper"
-            : $"global::{optType.TypeName}Mapper";
+        return GetFullyQualifiedName(optType.Namespace, $"{optType.TypeName}Mapper");
+    }
+
+    /// <summary>
+    /// Formats a default value for use in generated code.
+    /// </summary>
+    public static string FormatDefaultValue(object? value, ITypeSymbol type)
+    {
+        if (value is null)
+            return "null";
+
+        if (type.SpecialType == SpecialType.System_String)
+            return $"\"{value}\"";
+
+        if (type.SpecialType == SpecialType.System_Boolean)
+            return value.ToString()!.ToLowerInvariant();
+
+        return value.ToString()!;
     }
 }

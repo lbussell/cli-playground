@@ -10,8 +10,8 @@ dotnet build
 dotnet run --project src/Sample -- hello World
 dotnet run --project src/Sample -- goodbye
 
-# Format code
-./format.ps1              # or: dotnet format && dotnet csharpier format .
+# Format code (run after writing new code or completing a task)
+./format.ps1 # or: dotnet format && dotnet csharpier format .
 ```
 
 ## Architecture

@@ -20,7 +20,7 @@ internal static class ConsoleAppEmitter
         Dictionary<string, OptionsTypeInfo> optionsTypes
     )
     {
-        var validCommands = commands.Where(c => c is not null).ToList();
+        var validCommands = commands.OfType<CommandMethodInfo>().ToList();
         if (validCommands.Count == 0)
             return null;
 
@@ -47,7 +47,7 @@ internal static class ConsoleAppEmitter
         builder.AppendLine("");
 
         // Generate ConsoleAppBuilder
-        EmitConsoleAppBuilderClass(builder, validCommands!, commands, optionsTypes);
+        EmitConsoleAppBuilderClass(builder, validCommands, commands, optionsTypes);
 
         return builder.ToString();
     }
@@ -57,9 +57,7 @@ internal static class ConsoleAppEmitter
         builder.AppendLine("internal static class ConsoleApp");
         builder.AppendLine("{");
         builder.Indent();
-        builder.AppendLine(
-            "public static ConsoleAppBuilder CreateBuilder(string[] args) => new(args);"
-        );
+        builder.AppendLine("public static ConsoleAppBuilder CreateBuilder(string[] args) => new(args);");
         builder.Dedent();
         builder.AppendLine("}");
     }
@@ -77,9 +75,7 @@ internal static class ConsoleAppEmitter
 
         // Fields
         builder.AppendLine("private readonly string[] _args;");
-        builder.AppendLine(
-            "private readonly List<Func<IServiceProvider, Command>> _commandFactories = [];"
-        );
+        builder.AppendLine("private readonly List<Func<IServiceProvider, Command>> _commandFactories = [];");
         builder.AppendLine("private Func<IServiceProvider, RootCommand>? _rootCommandFactory;");
         builder.AppendLine("");
 
@@ -119,17 +115,12 @@ internal static class ConsoleAppEmitter
         builder.Indent();
         builder.AppendLine("_args = args;");
         builder.AppendLine("var settings = new HostApplicationBuilderSettings { Args = args };");
-        builder.AppendLine(
-            "Host = Microsoft.Extensions.Hosting.Host.CreateEmptyApplicationBuilder(settings);"
-        );
+        builder.AppendLine("Host = Microsoft.Extensions.Hosting.Host.CreateEmptyApplicationBuilder(settings);");
         builder.Dedent();
         builder.AppendLine("}");
     }
 
-    private static void EmitAddCommandMethod(
-        IndentingBuilder builder,
-        List<CommandMethodInfo> validCommands
-    )
+    private static void EmitAddCommandMethod(IndentingBuilder builder, List<CommandMethodInfo> validCommands)
     {
         builder.AppendLine(
             "public ConsoleAppBuilder AddCommand<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] T>() where T : class"
@@ -147,14 +138,10 @@ internal static class ConsoleAppEmitter
                 var prefix = i == 0 ? "if" : "else if";
                 var firstCmd = group.First();
 
-                builder.AppendLine(
-                    $"{prefix} (typeof(T) == typeof({firstCmd.ContainingClassFullName}))"
-                );
+                builder.AppendLine($"{prefix} (typeof(T) == typeof({firstCmd.ContainingClassFullName}))");
                 builder.AppendLine("{");
                 builder.Indent();
-                builder.AppendLine(
-                    $"Host.Services.AddTransient<{firstCmd.ContainingClassFullName}>();"
-                );
+                builder.AppendLine($"Host.Services.AddTransient<{firstCmd.ContainingClassFullName}>();");
 
                 foreach (var cmd in group)
                 {
@@ -208,9 +195,7 @@ internal static class ConsoleAppEmitter
         builder.AppendLine("{");
         builder.Indent();
 
-        builder.AppendLine(
-            $"var instance = sp.GetRequiredService<{cmd.ContainingClassFullName}>();"
-        );
+        builder.AppendLine($"var instance = sp.GetRequiredService<{cmd.ContainingClassFullName}>();");
         builder.AppendLine("");
 
         // Create the command
@@ -225,9 +210,7 @@ internal static class ConsoleAppEmitter
 
         if (cmd.Description is not null)
         {
-            builder.AppendLine(
-                $"command.Description = \"{Utilities.EscapeString(cmd.Description)}\";"
-            );
+            builder.AppendLine($"command.Description = \"{Utilities.EscapeString(cmd.Description)}\";");
         }
 
         builder.AppendLine("");

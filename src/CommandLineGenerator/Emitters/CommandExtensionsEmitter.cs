@@ -17,7 +17,7 @@ internal static class CommandExtensionsEmitter
     /// </summary>
     public static string? Emit(ImmutableArray<OptionsTypeInfo?> optionsTypes)
     {
-        var validTypes = optionsTypes.Where(o => o is not null).ToList();
+        var validTypes = optionsTypes.OfType<OptionsTypeInfo>().ToList();
         if (validTypes.Count == 0)
             return null;
 
@@ -36,9 +36,7 @@ internal static class CommandExtensionsEmitter
         builder.Indent();
 
         builder.AppendLine("/// <summary>");
-        builder.AppendLine(
-            "/// Adds all arguments and options from the specified options type to the command."
-        );
+        builder.AppendLine("/// Adds all arguments and options from the specified options type to the command.");
         builder.AppendLine("/// </summary>");
         builder.AppendLine("public static void AddOptions<T>(this Command command)");
         builder.AppendLine("{");
@@ -46,7 +44,7 @@ internal static class CommandExtensionsEmitter
 
         for (int i = 0; i < validTypes.Count; i++)
         {
-            var opt = validTypes[i]!;
+            var opt = validTypes[i];
             var prefix = i == 0 ? "if" : "else if";
             var mapperName = Utilities.GetMapperName(opt);
 

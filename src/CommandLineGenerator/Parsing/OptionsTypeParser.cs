@@ -12,11 +12,6 @@ namespace CommandLineGenerator.Parsing;
 /// </summary>
 internal static class OptionsTypeParser
 {
-    private const string MapCommandLineOptionsAttributeName =
-        "CommandLineGenerator.MapCommandLineOptionsAttribute";
-    private const string ArgumentAttributeName = "CommandLineGenerator.ArgumentAttribute";
-    private const string OptionAttributeName = "CommandLineGenerator.OptionAttribute";
-
     /// <summary>
     /// Extracts metadata from a type decorated with [MapCommandLineOptions].
     /// </summary>
@@ -26,21 +21,16 @@ internal static class OptionsTypeParser
             return null;
 
         var mapAttr = ctx.Attributes.FirstOrDefault(a =>
-            a.AttributeClass?.ToDisplayString() == MapCommandLineOptionsAttributeName
+            a.AttributeClass?.ToDisplayString() == AttributeNames.MapCommandLineOptions
         );
 
         if (mapAttr is null)
             return null;
 
         // Check for UseKebabCase property
-        var useKebabCase = true;
-        foreach (var namedArg in mapAttr.NamedArguments)
-        {
-            if (namedArg.Key == "UseKebabCase" && namedArg.Value.Value is bool val)
-            {
-                useKebabCase = val;
-            }
-        }
+        var useKebabCase = mapAttr.NamedArguments.FirstOrDefault(a => a.Key == "UseKebabCase").Value.Value is bool val
+            ? val
+            : true;
 
         // Get members from primary constructor parameters (for records) or properties
         var members = new List<OptionsMemberInfo>();
@@ -68,10 +58,7 @@ internal static class OptionsTypeParser
             {
                 if (prop.DeclaredAccessibility != Accessibility.Public)
                     continue;
-                if (
-                    prop.SetMethod is null
-                    || prop.SetMethod.DeclaredAccessibility != Accessibility.Public
-                )
+                if (prop.SetMethod is null || prop.SetMethod.DeclaredAccessibility != Accessibility.Public)
                     continue;
 
                 var memberInfo = ExtractMemberInfoFromProperty(prop, useKebabCase);
@@ -80,32 +67,25 @@ internal static class OptionsTypeParser
         }
 
         var ns = typeSymbol.ContainingNamespace.ToDisplayString();
-        var fullTypeName =
-            string.IsNullOrEmpty(ns) || ns == "<global namespace>"
-                ? $"global::{typeSymbol.Name}"
-                : $"global::{ns}.{typeSymbol.Name}";
+        var fullTypeName = Utilities.GetFullyQualifiedName(ns, typeSymbol.Name);
 
-        return new OptionsTypeInfo(
-            ns,
-            typeSymbol.Name,
-            fullTypeName,
-            members.ToImmutableArray(),
-            useKebabCase
-        );
+        return new OptionsTypeInfo(ns, typeSymbol.Name, fullTypeName, members.ToImmutableArray(), useKebabCase);
     }
 
-    private static OptionsMemberInfo ExtractMemberInfo(IParameterSymbol param, bool useKebabCase)
+    private static (bool isArgument, string? explicitName, string? alias, string? description) ExtractAttributeInfo(
+        IEnumerable<AttributeData> attributes
+    )
     {
         var isArgument = false;
         string? explicitName = null;
         string? alias = null;
         string? description = null;
 
-        foreach (var attr in param.GetAttributes())
+        foreach (var attr in attributes)
         {
             var attrName = attr.AttributeClass?.ToDisplayString();
 
-            if (attrName == ArgumentAttributeName)
+            if (attrName == AttributeNames.Argument)
             {
                 isArgument = true;
                 foreach (var namedArg in attr.NamedArguments)
@@ -116,7 +96,7 @@ internal static class OptionsTypeParser
                         description = namedArg.Value.Value as string;
                 }
             }
-            else if (attrName == OptionAttributeName)
+            else if (attrName == AttributeNames.Option)
             {
                 foreach (var namedArg in attr.NamedArguments)
                 {
@@ -130,8 +110,14 @@ internal static class OptionsTypeParser
             }
         }
 
-        var cliName =
-            explicitName ?? (useKebabCase ? Utilities.ToKebabCase(param.Name) : param.Name);
+        return (isArgument, explicitName, alias, description);
+    }
+
+    private static OptionsMemberInfo ExtractMemberInfo(IParameterSymbol param, bool useKebabCase)
+    {
+        var (isArgument, explicitName, alias, description) = ExtractAttributeInfo(param.GetAttributes());
+
+        var cliName = explicitName ?? (useKebabCase ? Utilities.ToKebabCase(param.Name) : param.Name);
         var isBoolean = param.Type.SpecialType == SpecialType.System_Boolean;
 
         return new OptionsMemberInfo(
@@ -142,52 +128,15 @@ internal static class OptionsTypeParser
             isBoolean,
             param.NullableAnnotation == NullableAnnotation.Annotated,
             param.HasExplicitDefaultValue,
-            param.HasExplicitDefaultValue
-                ? FormatDefaultValue(param.ExplicitDefaultValue, param.Type)
-                : null,
+            param.HasExplicitDefaultValue ? Utilities.FormatDefaultValue(param.ExplicitDefaultValue, param.Type) : null,
             alias,
             description
         );
     }
 
-    private static OptionsMemberInfo ExtractMemberInfoFromProperty(
-        IPropertySymbol prop,
-        bool useKebabCase
-    )
+    private static OptionsMemberInfo ExtractMemberInfoFromProperty(IPropertySymbol prop, bool useKebabCase)
     {
-        var isArgument = false;
-        string? explicitName = null;
-        string? alias = null;
-        string? description = null;
-
-        foreach (var attr in prop.GetAttributes())
-        {
-            var attrName = attr.AttributeClass?.ToDisplayString();
-
-            if (attrName == ArgumentAttributeName)
-            {
-                isArgument = true;
-                foreach (var namedArg in attr.NamedArguments)
-                {
-                    if (namedArg.Key == "Name")
-                        explicitName = namedArg.Value.Value as string;
-                    if (namedArg.Key == "Description")
-                        description = namedArg.Value.Value as string;
-                }
-            }
-            else if (attrName == OptionAttributeName)
-            {
-                foreach (var namedArg in attr.NamedArguments)
-                {
-                    if (namedArg.Key == "Name")
-                        explicitName = namedArg.Value.Value as string;
-                    if (namedArg.Key == "Alias")
-                        alias = namedArg.Value.Value as string;
-                    if (namedArg.Key == "Description")
-                        description = namedArg.Value.Value as string;
-                }
-            }
-        }
+        var (isArgument, explicitName, alias, description) = ExtractAttributeInfo(prop.GetAttributes());
 
         var cliName = explicitName ?? (useKebabCase ? Utilities.ToKebabCase(prop.Name) : prop.Name);
         var isBoolean = prop.Type.SpecialType == SpecialType.System_Boolean;
@@ -205,19 +154,5 @@ internal static class OptionsTypeParser
             alias,
             description
         );
-    }
-
-    private static string FormatDefaultValue(object? value, ITypeSymbol type)
-    {
-        if (value is null)
-            return "null";
-
-        if (type.SpecialType == SpecialType.System_String)
-            return $"\"{value}\"";
-
-        if (type.SpecialType == SpecialType.System_Boolean)
-            return value.ToString()!.ToLowerInvariant();
-
-        return value.ToString()!;
     }
 }

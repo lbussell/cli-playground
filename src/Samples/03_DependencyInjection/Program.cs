@@ -24,14 +24,10 @@ internal record HelloOptions([Argument] string Name, string Greeting = "Hello");
 internal record GoodbyeOptions([Argument] string Name);
 
 [MapCommandLineOptions]
-internal record VerboseOptions(
-    [Option(Alias = "-v", Description = "Enable verbose output")] bool Verbose = false
-);
+internal record VerboseOptions([Option(Alias = "-v", Description = "Enable verbose output")] bool Verbose = false);
 
 [MapCommandLineOptions]
-internal record InfoOptions(
-    [Option(Description = "Show version information")] bool Version = false
-);
+internal record InfoOptions([Option(Description = "Show version information")] bool Version = false);
 
 internal sealed class Commands(GreetingService greetingService, FarewellService farewellService)
 {
@@ -82,12 +78,10 @@ internal sealed class Commands(GreetingService greetingService, FarewellService 
 
 internal sealed class GreetingService
 {
-    public void Greet(string name, string greeting = "Hello") =>
-        Console.WriteLine($"{greeting}, {name}!");
+    public void Greet(string name, string greeting = "Hello") => Console.WriteLine($"{greeting}, {name}!");
 }
 
 internal sealed class FarewellService
 {
-    public void SayGoodbye(string name) =>
-        Console.WriteLine($"Farewell, {name}! Until we meet again.");
+    public void SayGoodbye(string name) => Console.WriteLine($"Farewell, {name}! Until we meet again.");
 }

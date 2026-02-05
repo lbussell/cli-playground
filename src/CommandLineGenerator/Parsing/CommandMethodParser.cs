@@ -11,21 +11,16 @@ namespace CommandLineGenerator.Parsing;
 /// </summary>
 internal static class CommandMethodParser
 {
-    private const string CommandAttributeName = "CommandLineGenerator.CommandAttribute";
-
     /// <summary>
     /// Extracts metadata from a method decorated with [Command].
     /// </summary>
-    public static CommandMethodInfo? Parse(
-        GeneratorAttributeSyntaxContext ctx,
-        CancellationToken ct
-    )
+    public static CommandMethodInfo? Parse(GeneratorAttributeSyntaxContext ctx, CancellationToken ct)
     {
         if (ctx.TargetSymbol is not IMethodSymbol methodSymbol)
             return null;
 
         var commandAttr = ctx.Attributes.FirstOrDefault(a =>
-            a.AttributeClass?.ToDisplayString() == CommandAttributeName
+            a.AttributeClass?.ToDisplayString() == AttributeNames.Command
         );
 
         if (commandAttr is null)
@@ -45,27 +40,21 @@ internal static class CommandMethodParser
 
         var containingType = methodSymbol.ContainingType;
         var containingNs = containingType.ContainingNamespace.ToDisplayString();
-        var containingFullName =
-            string.IsNullOrEmpty(containingNs) || containingNs == "<global namespace>"
-                ? $"global::{containingType.Name}"
-                : $"global::{containingNs}.{containingType.Name}";
+        var containingFullName = Utilities.GetFullyQualifiedName(containingNs, containingType.Name);
 
         // Extract parameter types (should be options types)
         var optionsTypeNames = methodSymbol
             .Parameters.Select(p =>
             {
                 var ns = p.Type.ContainingNamespace?.ToDisplayString() ?? "";
-                return string.IsNullOrEmpty(ns) || ns == "<global namespace>"
-                    ? $"global::{p.Type.Name}"
-                    : $"global::{ns}.{p.Type.Name}";
+                return Utilities.GetFullyQualifiedName(ns, p.Type.Name);
             })
             .ToImmutableArray();
 
         // Check if method returns Task (async) or void (sync)
         var returnType = methodSymbol.ReturnType;
         var isAsync =
-            returnType.Name == "Task"
-            && returnType.ContainingNamespace?.ToDisplayString() == "System.Threading.Tasks";
+            returnType.Name == "Task" && returnType.ContainingNamespace?.ToDisplayString() == "System.Threading.Tasks";
 
         return new CommandMethodInfo(
             containingNs,

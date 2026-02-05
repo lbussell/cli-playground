@@ -22,13 +22,11 @@ internal static class OptionsMapperEmitter
         builder.AppendLine("#nullable enable");
         builder.AppendLine("");
         builder.AppendLine("using System;");
-        builder.AppendLine("using System.Collections.Generic;");
         builder.AppendLine("using System.CommandLine;");
         builder.AppendLine("using System.CommandLine.Parsing;");
         builder.AppendLine("");
 
-        var hasNamespace =
-            !string.IsNullOrEmpty(info.Namespace) && info.Namespace != "<global namespace>";
+        var hasNamespace = !string.IsNullOrEmpty(info.Namespace) && info.Namespace != Namespaces.Global;
         if (hasNamespace)
         {
             builder.AppendLine($"namespace {info.Namespace};");
@@ -142,8 +140,7 @@ internal static class OptionsMapperEmitter
 
     private static void EmitSymbolFactoryMethod(IndentingBuilder builder, OptionsMemberInfo member)
     {
-        var methodName =
-            $"Create{(member.IsArgument ? "Argument" : "Option")}_{member.PropertyName}";
+        var methodName = $"Create{(member.IsArgument ? "Argument" : "Option")}_{member.PropertyName}";
 
         if (member.IsArgument)
         {
@@ -155,11 +152,7 @@ internal static class OptionsMapperEmitter
         }
     }
 
-    private static void EmitArgumentFactory(
-        IndentingBuilder builder,
-        OptionsMemberInfo member,
-        string methodName
-    )
+    private static void EmitArgumentFactory(IndentingBuilder builder, OptionsMemberInfo member, string methodName)
     {
         builder.AppendLine($"private static Argument<{member.TypeName}> {methodName}()");
         builder.AppendLine("{");
@@ -178,9 +171,7 @@ internal static class OptionsMapperEmitter
 
         if (member.Description is not null)
         {
-            builder.AppendLine(
-                $"arg.Description = \"{Utilities.EscapeString(member.Description)}\";"
-            );
+            builder.AppendLine($"arg.Description = \"{Utilities.EscapeString(member.Description)}\";");
         }
 
         builder.AppendLine("return arg;");
@@ -188,11 +179,7 @@ internal static class OptionsMapperEmitter
         builder.AppendLine("}");
     }
 
-    private static void EmitOptionFactory(
-        IndentingBuilder builder,
-        OptionsMemberInfo member,
-        string methodName
-    )
+    private static void EmitOptionFactory(IndentingBuilder builder, OptionsMemberInfo member, string methodName)
     {
         builder.AppendLine($"private static Option<{member.TypeName}> {methodName}()");
         builder.AppendLine("{");
@@ -202,9 +189,7 @@ internal static class OptionsMapperEmitter
 
         if (member.IsBoolean)
         {
-            builder.AppendLine(
-                $"var opt = new Option<bool>(\"{optName}\") {{ Arity = ArgumentArity.Zero }};"
-            );
+            builder.AppendLine($"var opt = new Option<bool>(\"{optName}\") {{ Arity = ArgumentArity.Zero }};");
             if (member.HasDefaultValue)
             {
                 builder.AppendLine($"opt.DefaultValueFactory = _ => {member.DefaultValue};");
@@ -232,9 +217,7 @@ internal static class OptionsMapperEmitter
 
         if (member.Description is not null)
         {
-            builder.AppendLine(
-                $"opt.Description = \"{Utilities.EscapeString(member.Description)}\";"
-            );
+            builder.AppendLine($"opt.Description = \"{Utilities.EscapeString(member.Description)}\";");
         }
 
         builder.AppendLine("return opt;");
