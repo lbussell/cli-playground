@@ -40,12 +40,10 @@
         <!-- Example stable release version: 1.2.4 (pass -p:StableVersion=true) -->
         <PackageVersion Condition="'$(StableVersion)' == 'true'">
       $(MajorVersion).$(MinorVersion).$(PatchVersion)
-    </PackageVersion
-        >
+    </PackageVersion>
         <PackageVersion Condition="'$(StableVersion)' != 'true'">
       $(MajorVersion).$(MinorVersion).$(PatchVersion)-$(PreReleaseVersionLabel).$(BuildDate)
-    </PackageVersion
-        >
+    </PackageVersion>
     </PropertyGroup>
     <PropertyGroup Label="Licensing">
         <Authors>Logan Bussell</Authors>

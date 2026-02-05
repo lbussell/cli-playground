@@ -28,7 +28,10 @@ internal static class OptionsTypeParser
             return null;
 
         // Check for UseKebabCase property
-        var useKebabCase = mapAttr.NamedArguments.FirstOrDefault(a => a.Key == "UseKebabCase").Value.Value is bool val
+        var useKebabCase = mapAttr
+            .NamedArguments.FirstOrDefault(a => a.Key == "UseKebabCase")
+            .Value.Value
+            is bool val
             ? val
             : true;
 
@@ -58,7 +61,10 @@ internal static class OptionsTypeParser
             {
                 if (prop.DeclaredAccessibility != Accessibility.Public)
                     continue;
-                if (prop.SetMethod is null || prop.SetMethod.DeclaredAccessibility != Accessibility.Public)
+                if (
+                    prop.SetMethod is null
+                    || prop.SetMethod.DeclaredAccessibility != Accessibility.Public
+                )
                     continue;
 
                 var memberInfo = ExtractMemberInfoFromProperty(prop, useKebabCase);
@@ -69,12 +75,46 @@ internal static class OptionsTypeParser
         var ns = typeSymbol.ContainingNamespace.ToDisplayString();
         var fullTypeName = Utilities.GetFullyQualifiedName(ns, typeSymbol.Name);
 
-        return new OptionsTypeInfo(ns, typeSymbol.Name, fullTypeName, members.ToImmutableArray(), useKebabCase);
+        return new OptionsTypeInfo(
+            ns,
+            typeSymbol.Name,
+            fullTypeName,
+            members.ToImmutableArray(),
+            useKebabCase
+        );
     }
 
-    private static (bool isArgument, string? explicitName, string? alias, string? description) ExtractAttributeInfo(
-        IEnumerable<AttributeData> attributes
-    )
+    /// <summary>
+    /// Determines if a type is nullable (either a nullable value type like int? or a nullable reference type like string?).
+    /// </summary>
+    private static bool IsNullableType(ITypeSymbol type)
+    {
+        // Check for nullable value types (e.g., int?, double?, DateTime?)
+        // These are represented as Nullable<T> where T is a value type
+        if (
+            type is INamedTypeSymbol namedType
+            && namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T
+        )
+        {
+            return true;
+        }
+
+        // Check for nullable reference types (e.g., string?)
+        // These have NullableAnnotation.Annotated
+        if (type.NullableAnnotation == NullableAnnotation.Annotated)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static (
+        bool isArgument,
+        string? explicitName,
+        string? alias,
+        string? description
+    ) ExtractAttributeInfo(IEnumerable<AttributeData> attributes)
     {
         var isArgument = false;
         string? explicitName = null;
@@ -115,11 +155,15 @@ internal static class OptionsTypeParser
 
     private static OptionsMemberInfo ExtractMemberInfo(IParameterSymbol param, bool useKebabCase)
     {
-        var (isArgument, explicitName, alias, description) = ExtractAttributeInfo(param.GetAttributes());
+        var (isArgument, explicitName, alias, description) = ExtractAttributeInfo(
+            param.GetAttributes()
+        );
 
-        var cliName = explicitName ?? (useKebabCase ? Utilities.ToKebabCase(param.Name) : param.Name);
+        var cliName =
+            explicitName ?? (useKebabCase ? Utilities.ToKebabCase(param.Name) : param.Name);
         var isBoolean = param.Type.SpecialType == SpecialType.System_Boolean;
         var isValueType = param.Type.IsValueType;
+        var isNullable = IsNullableType(param.Type);
 
         return new OptionsMemberInfo(
             param.Name,
@@ -127,22 +171,30 @@ internal static class OptionsTypeParser
             cliName,
             isArgument,
             isBoolean,
-            param.NullableAnnotation == NullableAnnotation.Annotated,
+            isNullable,
             param.HasExplicitDefaultValue,
-            param.HasExplicitDefaultValue ? Utilities.FormatDefaultValue(param.ExplicitDefaultValue, param.Type) : null,
+            param.HasExplicitDefaultValue
+                ? Utilities.FormatDefaultValue(param.ExplicitDefaultValue, param.Type)
+                : null,
             alias,
             description,
             isValueType
         );
     }
 
-    private static OptionsMemberInfo ExtractMemberInfoFromProperty(IPropertySymbol prop, bool useKebabCase)
+    private static OptionsMemberInfo ExtractMemberInfoFromProperty(
+        IPropertySymbol prop,
+        bool useKebabCase
+    )
     {
-        var (isArgument, explicitName, alias, description) = ExtractAttributeInfo(prop.GetAttributes());
+        var (isArgument, explicitName, alias, description) = ExtractAttributeInfo(
+            prop.GetAttributes()
+        );
 
         var cliName = explicitName ?? (useKebabCase ? Utilities.ToKebabCase(prop.Name) : prop.Name);
         var isBoolean = prop.Type.SpecialType == SpecialType.System_Boolean;
         var isValueType = prop.Type.IsValueType;
+        var isNullable = IsNullableType(prop.Type);
 
         // Properties don't have default values in the same way; we'd need to analyze initializers
         return new OptionsMemberInfo(
@@ -151,7 +203,7 @@ internal static class OptionsTypeParser
             cliName,
             isArgument,
             isBoolean,
-            prop.NullableAnnotation == NullableAnnotation.Annotated,
+            isNullable,
             false,
             null,
             alias,

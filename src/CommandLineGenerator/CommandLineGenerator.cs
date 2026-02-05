@@ -23,14 +23,18 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         // Always generate the base infrastructure (attributes)
         context.RegisterPostInitializationOutput(static ctx =>
         {
-            ctx.AddSource("Attributes.g.cs", SourceText.From(AttributesEmitter.Emit(), Encoding.UTF8));
+            ctx.AddSource(
+                "Attributes.g.cs",
+                SourceText.From(AttributesEmitter.Emit(), Encoding.UTF8)
+            );
         });
 
         // Discover options types with [MapCommandLineOptions]
         var optionsTypes = context
             .SyntaxProvider.ForAttributeWithMetadataName(
                 AttributeNames.MapCommandLineOptions,
-                predicate: static (node, _) => node is RecordDeclarationSyntax or ClassDeclarationSyntax,
+                predicate: static (node, _) =>
+                    node is RecordDeclarationSyntax or ClassDeclarationSyntax,
                 transform: static (ctx, ct) => OptionsTypeParser.Parse(ctx, ct)
             )
             .Where(static o => o is not null)
@@ -55,12 +59,17 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
             {
                 var commands = data.Left;
                 var options = data.Right;
-                var optionsDict = options.Where(o => o is not null).ToDictionary(o => o!.FullTypeName, o => o!);
+                var optionsDict = options
+                    .Where(o => o is not null)
+                    .ToDictionary(o => o!.FullTypeName, o => o!);
 
                 var consoleAppSource = ConsoleAppEmitter.Emit(commands!, optionsDict);
                 if (consoleAppSource is not null)
                 {
-                    spc.AddSource("ConsoleApp.g.cs", SourceText.From(consoleAppSource, Encoding.UTF8));
+                    spc.AddSource(
+                        "ConsoleApp.g.cs",
+                        SourceText.From(consoleAppSource, Encoding.UTF8)
+                    );
                 }
             }
         );
@@ -75,7 +84,10 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
                     if (opt is not null)
                     {
                         var mapperSource = OptionsMapperEmitter.Emit(opt);
-                        spc.AddSource($"{opt.TypeName}Mapper.g.cs", SourceText.From(mapperSource, Encoding.UTF8));
+                        spc.AddSource(
+                            $"{opt.TypeName}Mapper.g.cs",
+                            SourceText.From(mapperSource, Encoding.UTF8)
+                        );
                     }
                 }
 
@@ -83,7 +95,10 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
                 var extensionsSource = CommandExtensionsEmitter.Emit(optionsTypes);
                 if (extensionsSource is not null)
                 {
-                    spc.AddSource("CommandExtensions.g.cs", SourceText.From(extensionsSource, Encoding.UTF8));
+                    spc.AddSource(
+                        "CommandExtensions.g.cs",
+                        SourceText.From(extensionsSource, Encoding.UTF8)
+                    );
                 }
             }
         );

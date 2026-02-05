@@ -14,7 +14,10 @@ internal static class CommandMethodParser
     /// <summary>
     /// Extracts metadata from a method decorated with [Command].
     /// </summary>
-    public static CommandMethodInfo? Parse(GeneratorAttributeSyntaxContext ctx, CancellationToken ct)
+    public static CommandMethodInfo? Parse(
+        GeneratorAttributeSyntaxContext ctx,
+        CancellationToken ct
+    )
     {
         if (ctx.TargetSymbol is not IMethodSymbol methodSymbol)
             return null;
@@ -54,7 +57,8 @@ internal static class CommandMethodParser
         // Check if method returns Task (async) or void (sync)
         var returnType = methodSymbol.ReturnType;
         var isAsync =
-            returnType.Name == "Task" && returnType.ContainingNamespace?.ToDisplayString() == "System.Threading.Tasks";
+            returnType.Name == "Task"
+            && returnType.ContainingNamespace?.ToDisplayString() == "System.Threading.Tasks";
 
         return new CommandMethodInfo(
             containingNs,
