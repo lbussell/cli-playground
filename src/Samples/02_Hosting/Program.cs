@@ -4,7 +4,7 @@
 // CLI with Microsoft.Extensions.Hosting
 // Uses ConsoleAppBuilder for the hosting infrastructure
 
-using SystemCommandLineGenerator;
+using CommandLineGenerator;
 
 var builder = ConsoleApp.CreateBuilder(args);
 builder.AddCommand<Commands>();

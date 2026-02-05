@@ -4,8 +4,8 @@
 // CLI with Microsoft.Extensions.Hosting and Dependency Injection
 // Demonstrates constructor injection in command classes
 
+using CommandLineGenerator;
 using Microsoft.Extensions.DependencyInjection;
-using SystemCommandLineGenerator;
 
 var builder = ConsoleApp.CreateBuilder(args);
 
