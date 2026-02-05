@@ -22,12 +22,15 @@ internal record VerboseOptions(
     [Option(Alias = "-v", Description = "Enable verbose output")] bool Verbose = false
 );
 
+[MapCommandLineOptions]
+internal record StatusOptions([Option(Description = "Show detailed status")] bool Detailed = false);
+
 internal sealed class Commands
 {
     [Command("", Description = "Root command - shows welcome message")]
     public Task RootAsync()
     {
-        Console.WriteLine("Welcome! Use 'hello' or 'goodbye' subcommands.");
+        Console.WriteLine("Welcome! Use 'hello', 'goodbye', or 'status' subcommands.");
         return Task.CompletedTask;
     }
 
@@ -47,5 +50,17 @@ internal sealed class Commands
     {
         Console.WriteLine($"Goodbye, {options.Name}!");
         return Task.CompletedTask;
+    }
+
+    [Command("status", Description = "Show system status (synchronous command)")]
+    public void Status(StatusOptions options)
+    {
+        Console.WriteLine("System Status: OK");
+        if (options.Detailed)
+        {
+            Console.WriteLine("  - Memory: Available");
+            Console.WriteLine("  - Disk: Healthy");
+            Console.WriteLine("  - Network: Connected");
+        }
     }
 }

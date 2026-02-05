@@ -394,6 +394,12 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
             })
             .ToImmutableArray();
 
+        // Check if method returns Task (async) or void (sync)
+        var returnType = methodSymbol.ReturnType;
+        var isAsync =
+            returnType.Name == "Task"
+            && returnType.ContainingNamespace?.ToDisplayString() == "System.Threading.Tasks";
+
         return new CommandMethodInfo(
             containingNs,
             containingType.Name,
@@ -401,7 +407,8 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
             methodSymbol.Name,
             commandName,
             description,
-            optionsTypeNames
+            optionsTypeNames,
+            isAsync
         );
     }
 
@@ -682,7 +689,14 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
 
         // Call the method
         var methodArgs = string.Join(", ", optionVarNames);
-        builder.AppendLine($"await instance.{cmd.MethodName}({methodArgs});");
+        if (cmd.IsAsync)
+        {
+            builder.AppendLine($"await instance.{cmd.MethodName}({methodArgs});");
+        }
+        else
+        {
+            builder.AppendLine($"instance.{cmd.MethodName}({methodArgs});");
+        }
 
         builder.Dedent();
         builder.AppendLine("});");
@@ -1005,7 +1019,8 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         string MethodName,
         string CommandName,
         string? Description,
-        ImmutableArray<string> OptionsTypeNames
+        ImmutableArray<string> OptionsTypeNames,
+        bool IsAsync
     )
     {
         public bool IsRoot => string.IsNullOrEmpty(CommandName);
