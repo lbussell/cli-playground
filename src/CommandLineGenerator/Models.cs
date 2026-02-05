@@ -30,7 +30,8 @@ internal sealed record OptionsMemberInfo(
     bool HasDefaultValue,
     string? DefaultValue,
     string? Alias,
-    string? Description
+    string? Description,
+    bool IsValueType
 );
 
 /// <summary>

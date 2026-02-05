@@ -119,6 +119,7 @@ internal static class OptionsTypeParser
 
         var cliName = explicitName ?? (useKebabCase ? Utilities.ToKebabCase(param.Name) : param.Name);
         var isBoolean = param.Type.SpecialType == SpecialType.System_Boolean;
+        var isValueType = param.Type.IsValueType;
 
         return new OptionsMemberInfo(
             param.Name,
@@ -130,7 +131,8 @@ internal static class OptionsTypeParser
             param.HasExplicitDefaultValue,
             param.HasExplicitDefaultValue ? Utilities.FormatDefaultValue(param.ExplicitDefaultValue, param.Type) : null,
             alias,
-            description
+            description,
+            isValueType
         );
     }
 
@@ -140,6 +142,7 @@ internal static class OptionsTypeParser
 
         var cliName = explicitName ?? (useKebabCase ? Utilities.ToKebabCase(prop.Name) : prop.Name);
         var isBoolean = prop.Type.SpecialType == SpecialType.System_Boolean;
+        var isValueType = prop.Type.IsValueType;
 
         // Properties don't have default values in the same way; we'd need to analyze initializers
         return new OptionsMemberInfo(
@@ -152,7 +155,8 @@ internal static class OptionsTypeParser
             false,
             null,
             alias,
-            description
+            description,
+            isValueType
         );
     }
 }
