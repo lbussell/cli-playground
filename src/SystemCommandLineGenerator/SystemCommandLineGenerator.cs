@@ -21,7 +21,8 @@ namespace SystemCommandLineGenerator;
 public sealed class CommandLineGenerator : IIncrementalGenerator
 {
     private const string CommandAttributeName = "SystemCommandLineGenerator.CommandAttribute";
-    private const string MapCommandLineOptionsAttributeName = "SystemCommandLineGenerator.MapCommandLineOptionsAttribute";
+    private const string MapCommandLineOptionsAttributeName =
+        "SystemCommandLineGenerator.MapCommandLineOptionsAttribute";
     private const string ArgumentAttributeName = "SystemCommandLineGenerator.ArgumentAttribute";
     private const string OptionAttributeName = "SystemCommandLineGenerator.OptionAttribute";
 
@@ -37,7 +38,8 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         var optionsTypes = context
             .SyntaxProvider.ForAttributeWithMetadataName(
                 MapCommandLineOptionsAttributeName,
-                predicate: static (node, _) => node is RecordDeclarationSyntax or ClassDeclarationSyntax,
+                predicate: static (node, _) =>
+                    node is RecordDeclarationSyntax or ClassDeclarationSyntax,
                 transform: static (ctx, ct) => GetOptionsTypeInfo(ctx, ct)
             )
             .Where(static o => o is not null)
@@ -187,10 +189,12 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         var members = new List<OptionsMemberInfo>();
 
         // Check for primary constructor (records and classes with primary constructors)
-        var primaryCtor = typeSymbol.InstanceConstructors
-            .FirstOrDefault(c => c.Parameters.Length > 0 &&
-                c.DeclaringSyntaxReferences.Any(r =>
-                    r.GetSyntax(ct) is RecordDeclarationSyntax or ClassDeclarationSyntax));
+        var primaryCtor = typeSymbol.InstanceConstructors.FirstOrDefault(c =>
+            c.Parameters.Length > 0
+            && c.DeclaringSyntaxReferences.Any(r =>
+                r.GetSyntax(ct) is RecordDeclarationSyntax or ClassDeclarationSyntax
+            )
+        );
 
         if (primaryCtor is not null)
         {
@@ -207,7 +211,10 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
             {
                 if (prop.DeclaredAccessibility != Accessibility.Public)
                     continue;
-                if (prop.SetMethod is null || prop.SetMethod.DeclaredAccessibility != Accessibility.Public)
+                if (
+                    prop.SetMethod is null
+                    || prop.SetMethod.DeclaredAccessibility != Accessibility.Public
+                )
                     continue;
 
                 var memberInfo = ExtractMemberInfoFromProperty(prop, useKebabCase);
@@ -216,9 +223,10 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         }
 
         var ns = typeSymbol.ContainingNamespace.ToDisplayString();
-        var fullTypeName = string.IsNullOrEmpty(ns) || ns == "<global namespace>"
-            ? $"global::{typeSymbol.Name}"
-            : $"global::{ns}.{typeSymbol.Name}";
+        var fullTypeName =
+            string.IsNullOrEmpty(ns) || ns == "<global namespace>"
+                ? $"global::{typeSymbol.Name}"
+                : $"global::{ns}.{typeSymbol.Name}";
 
         return new OptionsTypeInfo(
             ns,
@@ -245,17 +253,22 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
                 isArgument = true;
                 foreach (var namedArg in attr.NamedArguments)
                 {
-                    if (namedArg.Key == "Name") explicitName = namedArg.Value.Value as string;
-                    if (namedArg.Key == "Description") description = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Name")
+                        explicitName = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Description")
+                        description = namedArg.Value.Value as string;
                 }
             }
             else if (attrName == OptionAttributeName)
             {
                 foreach (var namedArg in attr.NamedArguments)
                 {
-                    if (namedArg.Key == "Name") explicitName = namedArg.Value.Value as string;
-                    if (namedArg.Key == "Alias") alias = namedArg.Value.Value as string;
-                    if (namedArg.Key == "Description") description = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Name")
+                        explicitName = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Alias")
+                        alias = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Description")
+                        description = namedArg.Value.Value as string;
                 }
             }
         }
@@ -271,13 +284,18 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
             isBoolean,
             param.NullableAnnotation == NullableAnnotation.Annotated,
             param.HasExplicitDefaultValue,
-            param.HasExplicitDefaultValue ? FormatDefaultValue(param.ExplicitDefaultValue, param.Type) : null,
+            param.HasExplicitDefaultValue
+                ? FormatDefaultValue(param.ExplicitDefaultValue, param.Type)
+                : null,
             alias,
             description
         );
     }
 
-    private static OptionsMemberInfo ExtractMemberInfoFromProperty(IPropertySymbol prop, bool useKebabCase)
+    private static OptionsMemberInfo ExtractMemberInfoFromProperty(
+        IPropertySymbol prop,
+        bool useKebabCase
+    )
     {
         var isArgument = false;
         string? explicitName = null;
@@ -293,17 +311,22 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
                 isArgument = true;
                 foreach (var namedArg in attr.NamedArguments)
                 {
-                    if (namedArg.Key == "Name") explicitName = namedArg.Value.Value as string;
-                    if (namedArg.Key == "Description") description = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Name")
+                        explicitName = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Description")
+                        description = namedArg.Value.Value as string;
                 }
             }
             else if (attrName == OptionAttributeName)
             {
                 foreach (var namedArg in attr.NamedArguments)
                 {
-                    if (namedArg.Key == "Name") explicitName = namedArg.Value.Value as string;
-                    if (namedArg.Key == "Alias") alias = namedArg.Value.Value as string;
-                    if (namedArg.Key == "Description") description = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Name")
+                        explicitName = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Alias")
+                        alias = namedArg.Value.Value as string;
+                    if (namedArg.Key == "Description")
+                        description = namedArg.Value.Value as string;
                 }
             }
         }
@@ -341,25 +364,28 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         if (commandAttr is null)
             return null;
 
-        var commandName = commandAttr.ConstructorArguments.Length > 0
-            ? commandAttr.ConstructorArguments[0].Value as string ?? ""
-            : "";
+        var commandName =
+            commandAttr.ConstructorArguments.Length > 0
+                ? commandAttr.ConstructorArguments[0].Value as string ?? ""
+                : "";
 
         string? description = null;
         foreach (var namedArg in commandAttr.NamedArguments)
         {
-            if (namedArg.Key == "Description") description = namedArg.Value.Value as string;
+            if (namedArg.Key == "Description")
+                description = namedArg.Value.Value as string;
         }
 
         var containingType = methodSymbol.ContainingType;
         var containingNs = containingType.ContainingNamespace.ToDisplayString();
-        var containingFullName = string.IsNullOrEmpty(containingNs) || containingNs == "<global namespace>"
-            ? $"global::{containingType.Name}"
-            : $"global::{containingNs}.{containingType.Name}";
+        var containingFullName =
+            string.IsNullOrEmpty(containingNs) || containingNs == "<global namespace>"
+                ? $"global::{containingType.Name}"
+                : $"global::{containingNs}.{containingType.Name}";
 
         // Extract parameter types (should be options types)
-        var optionsTypeNames = methodSymbol.Parameters
-            .Select(p =>
+        var optionsTypeNames = methodSymbol
+            .Parameters.Select(p =>
             {
                 var ns = p.Type.ContainingNamespace?.ToDisplayString() ?? "";
                 return string.IsNullOrEmpty(ns) || ns == "<global namespace>"
@@ -444,7 +470,9 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         builder.AppendLine("internal static class ConsoleApp");
         builder.AppendLine("{");
         builder.Indent();
-        builder.AppendLine("public static ConsoleAppBuilder CreateBuilder(string[] args) => new(args);");
+        builder.AppendLine(
+            "public static ConsoleAppBuilder CreateBuilder(string[] args) => new(args);"
+        );
         builder.Dedent();
         builder.AppendLine("}");
         builder.AppendLine("");
@@ -455,7 +483,9 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         builder.Indent();
 
         builder.AppendLine("private readonly string[] _args;");
-        builder.AppendLine("private readonly List<Func<IServiceProvider, Command>> _commandFactories = [];");
+        builder.AppendLine(
+            "private readonly List<Func<IServiceProvider, Command>> _commandFactories = [];"
+        );
         builder.AppendLine("private Func<IServiceProvider, RootCommand>? _rootCommandFactory;");
         builder.AppendLine("");
 
@@ -464,7 +494,9 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         builder.Indent();
         builder.AppendLine("_args = args;");
         builder.AppendLine("var settings = new HostApplicationBuilderSettings { Args = args };");
-        builder.AppendLine("Host = Microsoft.Extensions.Hosting.Host.CreateEmptyApplicationBuilder(settings);");
+        builder.AppendLine(
+            "Host = Microsoft.Extensions.Hosting.Host.CreateEmptyApplicationBuilder(settings);"
+        );
         builder.Dedent();
         builder.AppendLine("}");
         builder.AppendLine("");
@@ -473,14 +505,14 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         builder.AppendLine("");
 
         // Generate a single AddCommand<T>() that switches on type
-        builder.AppendLine("public ConsoleAppBuilder AddCommand<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] T>() where T : class");
+        builder.AppendLine(
+            "public ConsoleAppBuilder AddCommand<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] T>() where T : class"
+        );
         builder.AppendLine("{");
         builder.Indent();
 
         // Generate switch cases for each command - keyed by containing class
-        var containingClasses = validCommands
-            .GroupBy(c => c!.ContainingClassFullName)
-            .ToList();
+        var containingClasses = validCommands.GroupBy(c => c!.ContainingClassFullName).ToList();
 
         if (containingClasses.Count > 0)
         {
@@ -490,10 +522,14 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
                 var prefix = i == 0 ? "if" : "else if";
                 var firstCmd = group.First()!;
 
-                builder.AppendLine($"{prefix} (typeof(T) == typeof({firstCmd.ContainingClassFullName}))");
+                builder.AppendLine(
+                    $"{prefix} (typeof(T) == typeof({firstCmd.ContainingClassFullName}))"
+                );
                 builder.AppendLine("{");
                 builder.Indent();
-                builder.AppendLine($"Host.Services.AddTransient<{firstCmd.ContainingClassFullName}>();");
+                builder.AppendLine(
+                    $"Host.Services.AddTransient<{firstCmd.ContainingClassFullName}>();"
+                );
 
                 foreach (var cmd in group)
                 {
@@ -515,13 +551,17 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
             builder.AppendLine("else");
             builder.AppendLine("{");
             builder.Indent();
-            builder.AppendLine("throw new InvalidOperationException($\"Type '{typeof(T).FullName}' is not a registered command class.\");");
+            builder.AppendLine(
+                "throw new InvalidOperationException($\"Type '{typeof(T).FullName}' is not a registered command class.\");"
+            );
             builder.Dedent();
             builder.AppendLine("}");
         }
         else
         {
-            builder.AppendLine("throw new InvalidOperationException($\"Type '{typeof(T).FullName}' is not a registered command class.\");");
+            builder.AppendLine(
+                "throw new InvalidOperationException($\"Type '{typeof(T).FullName}' is not a registered command class.\");"
+            );
         }
 
         builder.AppendLine("");
@@ -587,7 +627,9 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         builder.AppendLine("{");
         builder.Indent();
 
-        builder.AppendLine($"var instance = sp.GetRequiredService<{cmd.ContainingClassFullName}>();");
+        builder.AppendLine(
+            $"var instance = sp.GetRequiredService<{cmd.ContainingClassFullName}>();"
+        );
         builder.AppendLine("");
 
         // Create the command
@@ -653,7 +695,8 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
 
     private static string GetMapperName(OptionsTypeInfo optType)
     {
-        var hasNamespace = !string.IsNullOrEmpty(optType.Namespace) && optType.Namespace != "<global namespace>";
+        var hasNamespace =
+            !string.IsNullOrEmpty(optType.Namespace) && optType.Namespace != "<global namespace>";
         return hasNamespace
             ? $"global::{optType.Namespace}.{optType.TypeName}Mapper"
             : $"global::{optType.TypeName}Mapper";
@@ -677,7 +720,8 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         builder.AppendLine("using System.CommandLine.Parsing;");
         builder.AppendLine("");
 
-        var hasNamespace = !string.IsNullOrEmpty(info.Namespace) && info.Namespace != "<global namespace>";
+        var hasNamespace =
+            !string.IsNullOrEmpty(info.Namespace) && info.Namespace != "<global namespace>";
         if (hasNamespace)
         {
             builder.AppendLine($"namespace {info.Namespace};");
@@ -699,11 +743,15 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
 
             if (member.IsArgument)
             {
-                builder.AppendLine($"private static Argument<{member.TypeName}> {propName} {{ get; }} = CreateArgument_{member.PropertyName}();");
+                builder.AppendLine(
+                    $"private static Argument<{member.TypeName}> {propName} {{ get; }} = CreateArgument_{member.PropertyName}();"
+                );
             }
             else
             {
-                builder.AppendLine($"private static Option<{member.TypeName}> {propName} {{ get; }} = CreateOption_{member.PropertyName}();");
+                builder.AppendLine(
+                    $"private static Option<{member.TypeName}> {propName} {{ get; }} = CreateOption_{member.PropertyName}();"
+                );
             }
         }
 
@@ -802,7 +850,9 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         builder.Indent();
 
         builder.AppendLine("/// <summary>");
-        builder.AppendLine("/// Adds all arguments and options from the specified options type to the command.");
+        builder.AppendLine(
+            "/// Adds all arguments and options from the specified options type to the command."
+        );
         builder.AppendLine("/// </summary>");
         builder.AppendLine("public static void AddOptions<T>(this Command command)");
         builder.AppendLine("{");
@@ -825,7 +875,9 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         builder.AppendLine("else");
         builder.AppendLine("{");
         builder.Indent();
-        builder.AppendLine("throw new InvalidOperationException($\"Type '{typeof(T).FullName}' is not a mapped options type.\");");
+        builder.AppendLine(
+            "throw new InvalidOperationException($\"Type '{typeof(T).FullName}' is not a mapped options type.\");"
+        );
         builder.Dedent();
         builder.AppendLine("}");
 
@@ -838,9 +890,13 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
         ctx.AddSource("CommandExtensions.g.cs", SourceText.From(builder.ToString(), Encoding.UTF8));
     }
 
-    private static void GenerateSymbolFactoryMethod(IndentingBuilder builder, OptionsMemberInfo member)
+    private static void GenerateSymbolFactoryMethod(
+        IndentingBuilder builder,
+        OptionsMemberInfo member
+    )
     {
-        var methodName = $"Create{(member.IsArgument ? "Argument" : "Option")}_{member.PropertyName}";
+        var methodName =
+            $"Create{(member.IsArgument ? "Argument" : "Option")}_{member.PropertyName}";
 
         if (member.IsArgument)
         {
@@ -850,11 +906,15 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
 
             if (member.HasDefaultValue)
             {
-                builder.AppendLine($"var arg = new Argument<{member.TypeName}>(\"{member.CliName}\") {{ DefaultValueFactory = _ => {member.DefaultValue} }};");
+                builder.AppendLine(
+                    $"var arg = new Argument<{member.TypeName}>(\"{member.CliName}\") {{ DefaultValueFactory = _ => {member.DefaultValue} }};"
+                );
             }
             else
             {
-                builder.AppendLine($"var arg = new Argument<{member.TypeName}>(\"{member.CliName}\");");
+                builder.AppendLine(
+                    $"var arg = new Argument<{member.TypeName}>(\"{member.CliName}\");"
+                );
             }
 
             if (member.Description is not null)
@@ -876,7 +936,9 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
 
             if (member.IsBoolean)
             {
-                builder.AppendLine($"var opt = new Option<bool>(\"{optName}\") {{ Arity = ArgumentArity.Zero }};");
+                builder.AppendLine(
+                    $"var opt = new Option<bool>(\"{optName}\") {{ Arity = ArgumentArity.Zero }};"
+                );
                 if (member.HasDefaultValue)
                 {
                     builder.AppendLine($"opt.DefaultValueFactory = _ => {member.DefaultValue};");
@@ -884,7 +946,9 @@ public sealed class CommandLineGenerator : IIncrementalGenerator
             }
             else if (member.HasDefaultValue)
             {
-                builder.AppendLine($"var opt = new Option<{member.TypeName}>(\"{optName}\") {{ DefaultValueFactory = _ => {member.DefaultValue} }};");
+                builder.AppendLine(
+                    $"var opt = new Option<{member.TypeName}>(\"{optName}\") {{ DefaultValueFactory = _ => {member.DefaultValue} }};"
+                );
             }
             else
             {

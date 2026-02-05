@@ -7,14 +7,18 @@
 using System.CommandLine;
 using SystemCommandLineGenerator;
 
-var myCommand = new RootCommand(description: "Command line app without hosting or dependency injection.");
+var myCommand = new RootCommand(
+    description: "Command line app without hosting or dependency injection."
+);
 myCommand.AddOptions<CommandLineOptions>();
-myCommand.SetAction((parseResult, ct) =>
-{
-    var options = CommandLineOptionsMapper.Parse(parseResult);
-    Console.WriteLine($"{options.Greeting}, {options.Name}!");
-    return Task.CompletedTask;
-});
+myCommand.SetAction(
+    (parseResult, ct) =>
+    {
+        var options = CommandLineOptionsMapper.Parse(parseResult);
+        Console.WriteLine($"{options.Greeting}, {options.Name}!");
+        return Task.CompletedTask;
+    }
+);
 
 return await myCommand.Parse(args).InvokeAsync();
 

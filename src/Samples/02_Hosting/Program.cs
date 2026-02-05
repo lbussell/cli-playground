@@ -11,26 +11,16 @@ builder.AddCommand<Commands>();
 
 return await builder.RunAsync();
 
-// Options records
+[MapCommandLineOptions]
+internal record HelloOptions([Argument] string Name, string Greeting = "Hello");
 
 [MapCommandLineOptions]
-internal record HelloOptions(
-    [Argument] string Name,
-    string Greeting = "Hello"
-);
-
-[MapCommandLineOptions]
-internal record GoodbyeOptions(
-    [Argument] string Name
-);
+internal record GoodbyeOptions([Argument] string Name);
 
 [MapCommandLineOptions]
 internal record VerboseOptions(
-    [Option(Alias = "-v", Description = "Enable verbose output")]
-    bool Verbose = false
+    [Option(Alias = "-v", Description = "Enable verbose output")] bool Verbose = false
 );
-
-// Command class
 
 internal sealed class Commands
 {

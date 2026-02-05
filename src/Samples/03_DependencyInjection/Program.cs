@@ -17,26 +17,16 @@ builder.AddCommand<Commands>();
 
 return await builder.RunAsync();
 
-// Options records
+[MapCommandLineOptions]
+internal record HelloOptions([Argument] string Name, string Greeting = "Hello");
 
 [MapCommandLineOptions]
-internal record HelloOptions(
-    [Argument] string Name,
-    string Greeting = "Hello"
-);
-
-[MapCommandLineOptions]
-internal record GoodbyeOptions(
-    [Argument] string Name
-);
+internal record GoodbyeOptions([Argument] string Name);
 
 [MapCommandLineOptions]
 internal record VerboseOptions(
-    [Option(Alias = "-v", Description = "Enable verbose output")]
-    bool Verbose = false
+    [Option(Alias = "-v", Description = "Enable verbose output")] bool Verbose = false
 );
-
-// Command class with constructor injection
 
 internal sealed class Commands(GreetingService greetingService, FarewellService farewellService)
 {
@@ -73,16 +63,14 @@ internal sealed class Commands(GreetingService greetingService, FarewellService 
     }
 }
 
-// Services
-
 internal sealed class GreetingService
 {
-    public void Greet(string name, string greeting = "Hello") 
-        => Console.WriteLine($"{greeting}, {name}!");
+    public void Greet(string name, string greeting = "Hello") =>
+        Console.WriteLine($"{greeting}, {name}!");
 }
 
 internal sealed class FarewellService
 {
-    public void SayGoodbye(string name) 
-        => Console.WriteLine($"Farewell, {name}! Until we meet again.");
+    public void SayGoodbye(string name) =>
+        Console.WriteLine($"Farewell, {name}! Until we meet again.");
 }
