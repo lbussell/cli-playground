@@ -28,6 +28,11 @@ internal record VerboseOptions(
     [Option(Alias = "-v", Description = "Enable verbose output")] bool Verbose = false
 );
 
+[MapCommandLineOptions]
+internal record InfoOptions(
+    [Option(Description = "Show version information")] bool Version = false
+);
+
 internal sealed class Commands(GreetingService greetingService, FarewellService farewellService)
 {
     private readonly GreetingService _greetingService = greetingService;
@@ -36,7 +41,7 @@ internal sealed class Commands(GreetingService greetingService, FarewellService 
     [Command("", Description = "Root command - shows welcome message")]
     public Task RootAsync()
     {
-        Console.WriteLine("Welcome! Use 'hello' or 'goodbye' subcommands.");
+        Console.WriteLine("Welcome! Use 'hello', 'goodbye', or 'info' subcommands.");
         return Task.CompletedTask;
     }
 
@@ -60,6 +65,18 @@ internal sealed class Commands(GreetingService greetingService, FarewellService 
         }
         _farewellService.SayGoodbye(options.Name);
         return Task.CompletedTask;
+    }
+
+    [Command("info", Description = "Display app information (synchronous command)")]
+    public void Info(InfoOptions options)
+    {
+        Console.WriteLine("CLI Application with Dependency Injection");
+        if (options.Version)
+        {
+            Console.WriteLine("Version: 1.0.0");
+        }
+        Console.WriteLine($"Greeting Service: {_greetingService.GetType().Name}");
+        Console.WriteLine($"Farewell Service: {_farewellService.GetType().Name}");
     }
 }
 
