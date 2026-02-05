@@ -43,11 +43,16 @@ static class TestConstants
 // Test using constants from static class and local const
 [MapCommandLineOptions]
 record MyOptions(
-    [Option(Description = "Option with constant from static class")] string FailingOption1 = TestConstants.DefaultValue1,
-    [Option(Description = "Option with constant from same type")] string FailingOption2 = MyOptions.LocalConstant,
-    [Option(Description = "Number option with constant")] int NumberOption = TestConstants.DefaultNumber,
-    [Option(Description = "Boolean option with constant")] bool FlagOption = TestConstants.DefaultFlag,
-    [Option(Description = "Double option with constant")] double DoubleOption = TestConstants.DefaultDouble
+    [Option(Description = "Option with constant from static class")]
+        string FailingOption1 = TestConstants.DefaultValue1,
+    [Option(Description = "Option with constant from same type")]
+        string FailingOption2 = MyOptions.LocalConstant,
+    [Option(Description = "Number option with constant")]
+        int NumberOption = TestConstants.DefaultNumber,
+    [Option(Description = "Boolean option with constant")]
+        bool FlagOption = TestConstants.DefaultFlag,
+    [Option(Description = "Double option with constant")]
+        double DoubleOption = TestConstants.DefaultDouble
 )
 {
     public const string LocalConstant = "bar";

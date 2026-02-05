@@ -36,7 +36,9 @@ internal static class CommandExtensionsEmitter
         builder.Indent();
 
         builder.AppendLine("/// <summary>");
-        builder.AppendLine("/// Adds all arguments and options from the specified options type to the command.");
+        builder.AppendLine(
+            "/// Adds all arguments and options from the specified options type to the command."
+        );
         builder.AppendLine("/// </summary>");
         builder.AppendLine("public static void AddOptions<T>(this Command command)");
         builder.AppendLine("{");
