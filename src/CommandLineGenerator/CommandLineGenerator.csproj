@@ -5,7 +5,7 @@
 
   <PropertyGroup Label="Build Properties">
     <TargetFramework>netstandard2.0</TargetFramework>
-    <RootNamespace>SystemCommandLineGenerator</RootNamespace>
+    <RootNamespace>CommandLineGenerator</RootNamespace>
     <!-- AOT is not compatible with netstandard2.0 -->
     <IsAotCompatible>false</IsAotCompatible>
     <Nullable>enable</Nullable>
@@ -17,10 +17,10 @@
   </PropertyGroup>
 
   <PropertyGroup Label="Package Metadata">
-    <PackageId>LoganBussell.SystemCommandLineGenerator</PackageId>
+    <PackageId>LoganBussell.CommandLineGenerator</PackageId>
     <Description>Source generator for System.CommandLine boilerplate</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <RepositoryUrl>https://github.com/lbussell/cli-playground.git</RepositoryUrl>
+    <RepositoryUrl>https://github.com/lbussell/CommandLineGenerator.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>cli;commandline;source-generator;roslyn;system-commandline</PackageTags>
   </PropertyGroup>

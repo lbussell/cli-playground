@@ -5,7 +5,7 @@
 // Uses generated mapper directly with System.CommandLine
 
 using System.CommandLine;
-using SystemCommandLineGenerator;
+using CommandLineGenerator;
 
 var myCommand = new RootCommand(
     description: "Command line app without hosting or dependency injection."

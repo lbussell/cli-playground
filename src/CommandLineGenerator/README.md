@@ -1,4 +1,4 @@
-# SystemCommandLineGenerator
+# CommandLineGenerator
 
 A package that generates [System.CommandLine](https://github.com/dotnet/command-line-api) boilerplate for you.
 
@@ -14,7 +14,7 @@ A package that generates [System.CommandLine](https://github.com/dotnet/command-
 1. Add the package to your project:
 
 ```xml
-<PackageReference Include="LoganBussell.SystemCommandLineGenerator" Version="0.1.0" />
+<PackageReference Include="LoganBussell.CommandLineGenerator" Version="0.1.0" />
 ```
 
 2. Create a command class with the `[Command]` attribute:
@@ -54,7 +54,7 @@ The source generator analyzes your command classes at compile time and generates
 - `ConsoleApp` and `ConsoleAppBuilder` classes
 - Command factory methods that wire up System.CommandLine
 
-All generated code is visible in your IDE and can be inspected at `obj/Debug/net*/generated/SystemCommandLineGenerator/`.
+All generated code is visible in your IDE and can be inspected at `obj/Debug/net*/generated/CommandLineGenerator/`.
 
 ## License
 

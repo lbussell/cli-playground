@@ -9,7 +9,7 @@
   <ItemGroup>
     <PackageReference Include="System.CommandLine" />
     <ProjectReference
-      Include="../../SystemCommandLineGenerator/SystemCommandLineGenerator.csproj"
+      Include="../../CommandLineGenerator/CommandLineGenerator.csproj"
       OutputItemType="Analyzer"
       ReferenceOutputAssembly="false"
     />

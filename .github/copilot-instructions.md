@@ -20,7 +20,7 @@ This is a **source generator** project that generates CLI infrastructure from at
 
 ### Projects
 
-- **SystemCommandLineGenerator** - Roslyn incremental source generator (targets `netstandard2.0`)
+- **CommandLineGenerator** - Roslyn incremental source generator (targets `netstandard2.0`)
 - **Sample** - Example CLI app consuming the generator
 
 ### How It Works
@@ -33,7 +33,7 @@ See `src/Sample/Program.cs` for usage examples.
 
 ### Generated Output
 
-View generated files at: `src/Sample/obj/Debug/net10.0/generated/SystemCommandLineGenerator/`
+View generated files at: `src/Sample/obj/Debug/net10.0/generated/CommandLineGenerator/`
 
 - `Attributes.g.cs` - `[Command]`, `[Argument]`, `[Option]` attributes
 - `ConsoleApp.g.cs` - `ConsoleApp`, `ConsoleAppBuilder`, command factories
